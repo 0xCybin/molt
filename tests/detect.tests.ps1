@@ -53,9 +53,15 @@ foreach ($p in $allPairs) {
 }
 $short = @($allTargets | Where-Object { $_.Trim().Length -lt 4 })
 Check "no target is a dangerously short string" ($short.Count -eq 0)
-# The house style law: no em or en dashes anywhere users can read.
+# The house style law: no em or en dashes anywhere users can read. Not just
+# the catalog: every file that ships. The law is enforced, not remembered.
 $dashHits = @($catalog.Entries | Where-Object { ($_.Name + $_.What + $_.KeepIf) -match [char]0x2013 -or ($_.Name + $_.What + $_.KeepIf) -match [char]0x2014 })
 Check "no em or en dashes in any catalog text" ($dashHits.Count -eq 0)
+$shipFiles = @('README.md','Molt.ps1','Run.bat','Undo.bat','LICENSE') + @(Get-ChildItem (Join-Path $root 'src') -Filter *.ps1 | ForEach-Object { "src\$($_.Name)" })
+foreach ($sf in $shipFiles) {
+    $txt = [IO.File]::ReadAllText((Join-Path $root $sf))
+    Check "no em or en dashes in $sf" (-not ($txt -match [char]0x2013 -or $txt -match [char]0x2014))
+}
 
 Write-Host "`nHonesty guardrails (things we must NEVER match):"
 # Real names that live on real PCs right next to our targets. If any of these ever
