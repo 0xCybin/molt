@@ -1,6 +1,6 @@
 # molt
 
-**Shed what shipped uninvited.** A small, readable tool by [Cybin](https://nina-cybin.fly.dev) that removes bloatware, scamware and the junk Microsoft and PC makers preload, then locks Windows so it cannot quietly come back.
+**Shed what shipped uninvited.** A small, readable tool by [Cybin](https://github.com/0xCybin) that removes bloatware, scamware and the junk Microsoft and PC makers preload, then locks Windows so it cannot quietly come back.
 
 Plug in an LG monitor and Windows silently installs an "LG Monitor App" that throws McAfee popup ads and asks for broad access to your system. Dell, Alienware, HP and Lenovo machines pull the same trick with their own junk. Free downloads smuggle in fake browsers and fake antivirus. Microsoft preloads dead apps, ad feeds and sponsored tiles. Molt finds that stuff, shows you exactly what each thing is, lets you pick what to remove, and then shuts the door Windows leaves open.
 
