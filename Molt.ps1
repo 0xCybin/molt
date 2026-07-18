@@ -19,12 +19,18 @@ param(
 $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $PSCommandPath
 
+# WHAT THIS DOES: checks whether Molt is already running with administrator
+# power. It needs admin to remove apps for every account and to set the
+# protections, which is why the very next block asks Windows for it.
 function Test-Elevated {
     $id = [Security.Principal.WindowsIdentity]::GetCurrent()
     (New-Object Security.Principal.WindowsPrincipal($id)).IsInRole(
         [Security.Principal.WindowsBuiltinRole]::Administrator)
 }
 
+# This block is what pops the "do you want to allow this app to make changes"
+# Windows prompt. If Molt is not already admin, it relaunches itself as admin
+# (carrying the same options). If you click No, it keeps running with what it has.
 # Self-elevate so all-users removal + the HKLM lock actually work.
 if (-not (Test-Elevated) -and -not $NoElevate) {
     $argList = @('-NoProfile','-ExecutionPolicy','Bypass','-File', $PSCommandPath)
@@ -47,6 +53,9 @@ if ($Undo) {
     return
 }
 
+# WHAT THIS DOES: builds a fake, made up list of findings for the -Demo mode, so
+# the window can be shown off (in a screenshot or a quick look) without scanning a
+# real PC and without removing anything. These are examples only, not real results.
 function Get-DemoFindings {
     @(
         [pscustomobject]@{ Id='lg-monitor-app'; Name='LG Monitor App'; Publisher='LG Electronics'
@@ -76,6 +85,10 @@ function Get-DemoFindings {
     )
 }
 
+# This is the actual start of a normal run, the few lines that tie it together:
+# in demo mode use the fake examples, otherwise load the junk list and scan this
+# PC for real matches. Then check which protections are already on, and finally
+# hand it all to the window to show you. Everything from here is your decision.
 if ($Demo) {
     $findings = Get-DemoFindings
 } else {

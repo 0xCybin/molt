@@ -1,6 +1,19 @@
-# Cybin Molt GUI. Light natural-moth palette, frameless. WPF via Windows PowerShell 5.1.
+# Cybin Molt GUI. This file draws the window you see: the moth logo, the
+# checklist of junk, the three protection switches, the progress bar, and the
+# results page. It is the biggest file because describing how a window looks
+# takes a lot of lines, but it makes no decisions about what to remove; it just
+# shows the findings and passes your choices to the other files.
+
+# This line loads the Windows tools for drawing a window. It must stay here.
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
 
+# WHAT THIS DOES: builds and shows the whole Molt window from start to finish.
+# It lays out the logo and heading, makes a card for every piece of junk found
+# (with its checkbox, name, maker, and plain description), adds the three
+# protection switches, and wires up the "clean it up" button so that clicking it
+# runs the removals with a progress bar and then shows the results page. The
+# switches near the top (WhatIf, Demo, BuildOnly, SnapshotPath) are for preview
+# mode and for the automated tests; a normal run uses none of them.
 function Show-MoltGui {
     param(
         [array]   $Findings,
@@ -236,6 +249,10 @@ function Show-MoltGui {
     }
 
     $checks = New-Object System.Collections.ArrayList
+    # WHAT THIS DOES: builds one row in the checklist for a single piece of junk.
+    # It creates the tick box (pre-checked or not based on the recommendation),
+    # the big name, the maker in small text, the plain description, the exact
+    # item names it found, and the italic "keep it if" note. One call, one card.
     function New-Row($f) {
         $wrap = New-Object Windows.Controls.StackPanel; $wrap.Margin = '0,0,0,4'
         $dock = New-Object Windows.Controls.DockPanel; $dock.Margin = '0,14,0,14'; $dock.LastChildFill = $true
@@ -275,6 +292,9 @@ function Show-MoltGui {
         $win.FindName('AppsHint').Visibility = 'Collapsed'
     }
 
+    # WHAT THIS DOES: builds one of the three protection switches: its tick box,
+    # its short title, and the sentence under it explaining what it does. Same
+    # idea as New-Row above, but for a switch instead of a piece of junk.
     function New-Toggle($label, $desc, $isOn) {
         $dock = New-Object Windows.Controls.DockPanel; $dock.Margin = '0,0,0,14'; $dock.LastChildFill = $true
         $cb = New-Object Windows.Controls.CheckBox; $cb.Style = $tickStyle; $cb.IsChecked = [bool]$isOn; $cb.Margin = '0,2,16,0'
@@ -297,16 +317,30 @@ function Show-MoltGui {
     [void]$protectStack.Children.Add($tM.Row); [void]$protectStack.Children.Add($tS.Row); [void]$protectStack.Children.Add($tA.Row)
     $tMonitor = $tM.Check; $tStore = $tS.Check; $tAds = $tA.Check
 
+    # WHAT THIS DOES: counts how many boxes are ticked right now (junk plus the
+    # three switches) so the footer can show a live "N selected" count. The line
+    # below it updates that count every time you tick or untick anything.
     $countSel = { @($checks | Where-Object { $_.IsChecked }).Count + @($tMonitor,$tStore,$tAds | Where-Object { $_.IsChecked }).Count }.GetNewClosure()
     $statusText.Text = "$(& $countSel) selected"
     foreach ($c in @($checks + $tMonitor + $tStore + $tAds)) { $c.Add_Click({ $statusText.Text = "$(& $countSel) selected" }.GetNewClosure()) }
     if ($WhatIf) { $goButton.Content = 'preview' }
 
     $state = @{ Done = $false }
+    # WHAT THIS DOES: forces the window to redraw itself in the middle of a job.
+    # Without it, Windows would wait until all the removing is finished before
+    # painting anything, and the progress bar would look frozen. Calling this
+    # between each item lets the bar and the "working on..." text actually move.
     # Pumps the dispatcher so the bar and status text actually PAINT between
     # items. Without this, WPF renders nothing until the click handler returns
     # and the window looks frozen for the whole clean.
     $flushUi = { $win.Dispatcher.Invoke([Windows.Threading.DispatcherPriority]::Background, [action]{}) }.GetNewClosure()
+    # WHAT THIS DOES: everything that happens when you click the big button. The
+    # first click does the work: it hides the button, shows the progress bar,
+    # removes each ticked item one at a time (updating the bar as it goes),
+    # applies the protection switches, then wipes the checklist and paints the
+    # results page (a clear headline, a plain summary, and a tick or a warning
+    # per item). At that point the button becomes "done", and clicking it again
+    # closes the window (and self removes molt only if you ticked that box).
     $goButton.Add_Click({
         if ($state.Done) {
             if ($state.SelfDelete -and -not $WhatIf) { Invoke-MoltSelfDelete -AppRoot $AppRoot }
@@ -463,6 +497,12 @@ function Show-MoltGui {
     [void]$win.ShowDialog()
 }
 
+# WHAT THIS DOES: if you ticked "remove molt when i close", this deletes molt's
+# own folder as it exits. It is extremely careful first: it refuses unless the
+# folder clearly looks like a molt install AND contains nothing that is not part
+# of molt. That protects someone who unzipped molt loose into their Downloads,
+# so it can never take your own files with it. It also refuses on the developer's
+# copy (marked by a hidden .molt-dev file).
 function Invoke-MoltSelfDelete {
     param([string]$AppRoot)
     if (-not $AppRoot -or -not (Test-Path $AppRoot)) { return }

@@ -1,12 +1,21 @@
-# Molt removal engine. Executes removals. Every path is exact-match driven by the
-# findings from detect.ps1 - this file never decides WHAT to remove, only HOW.
+# Molt removal engine. This is the "removing" half. It only ever acts on the
+# exact items the finding step already matched against the junk list. It never
+# decides WHAT to remove on its own, only HOW to remove what was handed to it.
 
+# WHAT THIS DOES: checks whether the tool is running with administrator power.
+# Administrator is needed to remove apps for every user account and to change
+# the protection settings. Returns a simple yes or no.
 function Test-MoltElevated {
     $id = [Security.Principal.WindowsIdentity]::GetCurrent()
     (New-Object Security.Principal.WindowsPrincipal($id)).IsInRole(
         [Security.Principal.WindowsBuiltinRole]::Administrator)
 }
 
+# WHAT THIS DOES: looks up a single Store app by name and reports the real,
+# currently installed copies of it. The finding step, the removal step, and the
+# "did it actually go away" check all use this same lookup, so they always agree
+# with each other. Using one shared answer is what stopped the old bug where an
+# app looked removed but came back on the next scan.
 function Get-MoltLivePkgs {
     # The one instrument for "is this appx really on this PC": same view for
     # detection, removal targeting, and post-removal verification. Elevated =
@@ -20,6 +29,11 @@ function Get-MoltLivePkgs {
     }
 }
 
+# WHAT THIS DOES: removes one Store app (like the LG Monitor App or Candy Crush).
+# In preview mode it only says what it WOULD do and touches nothing. Otherwise it
+# uninstalls the app for every user if it can, tells Windows not to hand that app
+# to brand new accounts either, and then checks again to confirm it is really
+# gone. It reports back one of: would-remove, not-found, removed, failed, or error.
 function Remove-MoltAppx {
     param([Parameter(Mandatory)][string]$Name, [switch]$WhatIf)
     if ($WhatIf) { return [pscustomobject]@{ Target=$Name; Kind='appx'; Status='would-remove' } }
@@ -46,6 +60,11 @@ function Remove-MoltAppx {
     }
 }
 
+# WHAT THIS DOES: finds the Windows record for one normal installed program by
+# its exact name, so the tool can read that program's own official uninstaller.
+# If a maker name is also given, the record's maker must match too. That double
+# check is the safety rail for programs with common names: it makes sure the tool
+# only ever grabs the exact bad program, not an innocent one that shares a name.
 function Get-MoltUninstallEntry {
     # Exact DisplayName -> registry uninstall record (or $null).
     # When -Publisher is given, the record's Publisher must ALSO match exactly.
@@ -64,6 +83,11 @@ function Get-MoltUninstallEntry {
         Select-Object -First 1
 }
 
+# WHAT THIS DOES: actually runs a program's own built-in uninstaller, the same
+# one that runs when you remove it from "Add or remove programs". It asks it to
+# run quietly without popups and without forcing a restart where possible, waits
+# for it to finish, and reports whether it succeeded. Molt does not delete these
+# programs itself, it politely asks each program to uninstall itself.
 function Invoke-MoltUninstallString {
     param([string]$CommandLine)
     if ([string]::IsNullOrWhiteSpace($CommandLine)) { return $false }
@@ -83,6 +107,11 @@ function Invoke-MoltUninstallString {
     return ($p.ExitCode -in 0, 1605, 1614, 3010, 1641)
 }
 
+# WHAT THIS DOES: removes one normal installed program (like McAfee or Wave
+# Browser). It finds the program's record, and in preview mode just says what it
+# would do. Otherwise it runs that program's own uninstaller, then checks whether
+# the program is really gone, and reports back: would-remove, not-found, removed,
+# failed, or error.
 function Remove-MoltWin32 {
     param([Parameter(Mandatory)][string]$DisplayName, [string]$Publisher, [switch]$WhatIf)
     $entry = Get-MoltUninstallEntry -DisplayName $DisplayName -Publisher $Publisher
@@ -100,6 +129,10 @@ function Remove-MoltWin32 {
     }
 }
 
+# WHAT THIS DOES: the conductor for removals. You give it the list of things you
+# ticked in the window, and it removes each one by calling the right helper
+# (Store app or normal program) for every exact match. It collects what happened
+# to each and hands back a per item report the results screen shows you.
 function Invoke-MoltRemoval {
     # Takes selected findings (from Get-MoltFindings) and removes their exact hits.
     param([Parameter(Mandatory)]$Findings, [switch]$WhatIf)

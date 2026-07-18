@@ -1,5 +1,14 @@
-# Molt detection engine. Pure, testable. No side effects, no removal here.
+# Molt detection engine. This is the "finding" half of the tool. It only ever
+# LOOKS at your PC and compares what it finds against the junk list. It never
+# removes anything: that is a different file (remove.ps1). Nothing here can
+# change your computer.
 
+# WHAT THIS DOES: the safety gate of the whole tool. It answers one yes/no
+# question: "is this app's name EXACTLY one of the names on our junk list?"
+# It only says yes on a perfect, whole-word match (upper/lowercase does not
+# matter). It never says yes on a partial match. That is the promise that
+# keeps "LG" from ever touching Logitech's "LGHUB": the names are not identical,
+# so the answer is no.
 function Test-MoltMatch {
     # EXACT, case-insensitive, full-string equality against a list of targets.
     # Deliberately NOT substring/prefix/regex: that is the guarantee that a target
@@ -17,12 +26,34 @@ function Test-MoltMatch {
     return $false
 }
 
+# WHAT THIS DOES: opens the junk list file (data/catalog.psd1, the hand written
+# list of known bloatware) and loads it into memory so the rest of the tool can
+# read it. Think of it as opening the recipe book before cooking. It prefers the
+# normal Windows helper for this, but if that helper is ever missing on a PC it
+# falls back to reading the file as pure data (no code is ever run from the file),
+# so Molt still works everywhere. The file is a data list only, never a program.
 function Import-MoltCatalog {
     param([string]$Path)
-    $data = Import-PowerShellDataFile -Path $Path
-    return $data
+    if (Get-Command Import-PowerShellDataFile -ErrorAction SilentlyContinue) {
+        return Import-PowerShellDataFile -Path $Path
+    }
+    # Fallback: read the .psd1 as data only via the language parser. SafeGetValue
+    # evaluates literals (strings, numbers, booleans, hashtables, arrays) and
+    # THROWS on anything executable, so a catalog file can never run code.
+    $tokens = $null; $errors = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($Path, [ref]$tokens, [ref]$errors)
+    if ($errors -and $errors.Count) { throw "catalog parse error: $($errors[0].Message)" }
+    $hash = $ast.Find({ param($n) $n -is [System.Management.Automation.Language.HashtableAst] }, $false)
+    if (-not $hash) { throw "catalog has no data table at $Path" }
+    return $hash.SafeGetValue()
 }
 
+# WHAT THIS DOES: Windows sometimes keeps a "ghost" copy of an app that is not
+# really installed for anybody (it is just staged in the background). Those
+# ghosts cannot be removed because there is nothing there to remove, so if the
+# tool kept flagging them it would look like the junk never goes away. This
+# function throws the ghosts out and keeps only the apps a real person actually
+# has installed.
 function Select-MoltInstalledPkgs {
     # Keep only packages actually INSTALLED for at least one real user.
     # Get-AppxPackage -AllUsers also returns 'Staged' ghost copies owned by
@@ -38,6 +69,10 @@ function Select-MoltInstalledPkgs {
     }
 }
 
+# WHAT THIS DOES: gets the list of "Store apps" installed on the PC (the modern
+# kind of app Windows installs from the Microsoft Store, which is what the LG
+# Monitor App and Candy Crush are). If the tool is running as administrator it
+# looks at every user account on the PC; if not, just the current one.
 function Get-InstalledAppxNames {
     # Overridable in tests via -Names.
     # When elevated, scan every user's packages so detection sees exactly what
@@ -50,6 +85,11 @@ function Get-InstalledAppxNames {
     $pkgs | Select-Object -ExpandProperty Name -Unique
 }
 
+# WHAT THIS DOES: gets the list of normal installed programs (the classic kind
+# you would see in "Add or remove programs", like McAfee or Wave Browser). For
+# each one it grabs two things: the program's name and who made it (the
+# publisher). Knowing the maker is what lets the tool safely target a program
+# with a common name, because it can check the maker matches too.
 function Get-InstalledUninstallRecords {
     # Every uninstall registry record as {DisplayName, Publisher}. The Publisher
     # field is what lets a generic-sounding name (ReasonLabs' 'Online Security')
@@ -66,6 +106,9 @@ function Get-InstalledUninstallRecords {
         ForEach-Object { [pscustomobject]@{ DisplayName = $_.DisplayName; Publisher = [string]$_.Publisher } }
 }
 
+# WHAT THIS DOES: same list of normal installed programs as above, but just the
+# names without the maker. An older, simpler helper kept around so existing
+# tests keep working.
 function Get-InstalledUninstallNames {
     # Names-only view, kept for callers and tests that predate publisher matching.
     param([string[]]$Names)
@@ -73,6 +116,14 @@ function Get-InstalledUninstallNames {
     Get-InstalledUninstallRecords | Select-Object -ExpandProperty DisplayName -Unique
 }
 
+# WHAT THIS DOES: the heart of the "finding" step. It walks down the junk list
+# and, for each entry, checks whether that junk is actually on this PC right now.
+# It skips any list entry not marked Verified (a safety rule: half finished
+# entries can never act). For matches, it hands back a tidy summary the window
+# shows you: the name, who made it, the plain description, the "keep it if" note,
+# whether it should be pre-checked, and exactly which installed items matched.
+# If nothing on the list is found, it hands back nothing and the window says your
+# PC is clean.
 function Get-MoltFindings {
     # Returns one object per catalog entry that is BOTH verified AND currently present.
     param(

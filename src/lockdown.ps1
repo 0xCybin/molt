@@ -1,5 +1,11 @@
-# Molt lockdown engine. The "so it never comes back" half. Fully reversible.
+# Molt lockdown engine. This is the "so it never comes back" half. It flips a few
+# Windows settings so the junk cannot silently reinstall itself later. Every one
+# of these settings can be flipped straight back (that is what Undo.bat does), so
+# nothing here is permanent. These are the same switches buried deep in Windows
+# settings menus; Molt just gathers them in one place.
 
+# These four lines are the exact Windows settings locations (registry paths) the
+# switches live at. Plain readers can ignore them: they are just addresses.
 $script:MoltDeviceMeta   = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Device Metadata'
 $script:MoltDeviceMetaPol= 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\Device Metadata'
 $script:MoltCdm          = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'
@@ -21,11 +27,16 @@ $script:MoltAdKeys = @(
     'SoftLandingEnabled'                # tips pop-ups
 )
 
+# WHAT THIS DOES: reads one Windows setting and returns its current value (or
+# nothing if it has never been set). A small helper the checks below rely on.
 function Get-MoltRegDword {
     param([string]$Path, [string]$Name)
     (Get-ItemProperty -Path $Path -Name $Name -ErrorAction SilentlyContinue).$Name
 }
 
+# WHAT THIS DOES: checks whether each of the three protections is currently
+# turned on, so the window can show the switches already flipped for anything you
+# have set before. Returns a simple on/off for each of the three.
 function Get-MoltLockdownState {
     # Returns whether each protection is currently ON, for the UI checkboxes.
     [pscustomobject]@{
@@ -39,6 +50,12 @@ function Get-MoltLockdownState {
     }
 }
 
+# WHAT THIS DOES: turns ON whichever of the three protections you left checked.
+# Switch one stops Windows auto installing a maker's app when you plug in a
+# device (this is the switch that stops the LG situation). Switch two stops
+# Windows quietly dropping sponsored apps on you. Switch three turns off the
+# "suggested" app ads in your Start menu and Settings. In preview mode it only
+# says what it would do. It returns a plain list of what it changed.
 function Set-MoltLockdown {
     # Applies the protections the user left checked. HKLM parts require elevation.
     param([switch]$BlockMonitorAutoInstall, [switch]$BlockSilentStoreApps, [switch]$BlockStartAds, [switch]$WhatIf)
@@ -84,6 +101,10 @@ function Set-MoltLockdown {
     $done
 }
 
+# WHAT THIS DOES: the reverse of the switches above. It puts all three Windows
+# settings back exactly the way Windows had them by default (auto install on,
+# sponsored apps on, suggestions on). This is what runs when someone double
+# clicks Undo.bat. Nothing Molt locks down is permanent.
 function Undo-MoltLockdown {
     # Puts Windows back to its defaults (auto-download on, suggestions on).
     param([switch]$WhatIf)
