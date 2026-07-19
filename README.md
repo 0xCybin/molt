@@ -6,6 +6,10 @@ Plug in an LG monitor and Windows silently installs an "LG Monitor App" that thr
 
 ![molt](docs/molt-ui.png)
 
+**[Download Molt (free, no install)](https://github.com/0xCybin/molt/releases/download/v1.0.0/molt-1.0.0.zip)**
+
+Download it, unzip it, double click `Run.bat`. Full step by step instructions are in [How to download and run it](#how-to-download-and-run-it-about-2-minutes) below.
+
 ## The LG monitor thing (July 2026)
 
 If you got here searching "why did an LG Monitor App install itself" or "McAfee popup after plugging in an LG monitor", this is the tool for that. Plug an LG UltraGear or Smart Monitor into Windows 11 and Windows Device Setup Manager quietly pulls LG's companion app (`LGElectronics.LGMonitorApp`) from the Store using device metadata. For a lot of people the first sign it exists is a McAfee ad. Tom's Hardware, TechSpot and others covered it in July 2026, and the same silent install trick has been reported with Alienware and ASUS monitor apps too.
@@ -20,18 +24,20 @@ Molt removes the LG Monitor App and the McAfee trialware it promotes, then flips
 4. **Locks Windows down** with three switches: plugging a device back in will not silently reinstall anything, Windows stops dropping sponsored apps on you, and the "suggested" app ads in your Start menu and Settings turn off. (Your Spotlight wallpapers and pins stay untouched.)
 5. **Can remove itself** when it is done (unticked by default). The lock keeps the junk out either way; keeping molt around is simply how you run Undo someday.
 
-## How to use it
+## How to download and run it (about 2 minutes)
 
-1. Download the latest release and unzip it anywhere.
-2. Double click **`Run.bat`**.
-3. Click **Yes** at the Windows admin prompt. It needs admin to remove apps for every user and to set the protection.
-4. Review the checklist, then click **clean it up**. A progress bar walks through each item, and you get a plain receipt at the end:
+You do not need to know anything about code or GitHub for this.
+
+1. **Download it.** [Click here to download `molt-1.0.0.zip`](https://github.com/0xCybin/molt/releases/download/v1.0.0/molt-1.0.0.zip). It saves to your Downloads folder. (You can also open the [Releases page](https://github.com/0xCybin/molt/releases/latest) and grab the zip under **Assets**.)
+2. **Unzip it.** Find the file, right click it, choose **Extract All**, then **Extract**. Now you have a normal folder you can open.
+3. **Run it.** Open that folder and double click **`Run.bat`**.
+4. **If Windows shows a blue "Windows protected your PC" box,** click **More info**, then **Run anyway**. That box appears for any small free tool that is not signed by a giant company. Molt is unsigned on purpose so you can read every line first (`Molt.ps1` and the `src` folder).
+5. **Click Yes** at the admin prompt. It needs admin to remove apps for every user and to set the protection.
+6. **Pick what to remove,** then click **clean it up**. A progress bar walks through each item and you get a plain receipt at the end. Nothing is deleted until you okay it.
 
 ![after a clean](docs/molt-results.png)
 
-Changed your mind about the protections later? Double click **`Undo.bat`** to set them back to how Windows had them. Want to look before you leap? Run `Run.bat -WhatIf` for a preview that changes nothing.
-
-> **"Windows protected your PC" warning?** That is SmartScreen flagging any app that is not from a big signed vendor. Molt is free and unsigned on purpose. it is a plain, readable PowerShell script you can open and inspect. Click **More info**, then **Run anyway**, or read `Molt.ps1` and `src/` first. That transparency is the whole point of an anti spyware tool.
+Changed your mind about the protections later? Double click **`Undo.bat`** in the same folder to put them back the way Windows had them. Want to look before you leap? Run `Run.bat -WhatIf` in a PowerShell window for a preview that changes nothing.
 
 ## What it removes (and what it will not)
 
