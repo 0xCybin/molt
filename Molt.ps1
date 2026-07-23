@@ -33,12 +33,31 @@ function Test-Elevated {
 # (carrying the same options). If you click No, it keeps running with what it has.
 # Self-elevate so all-users removal + the HKLM lock actually work.
 if (-not (Test-Elevated) -and -not $NoElevate) {
-    $argList = @('-NoProfile','-ExecutionPolicy','Bypass','-File', $PSCommandPath)
+    # NOTE: the path is wrapped in quotes on purpose. Start-Process joins these
+    # args with plain spaces and adds no quoting of its own, so an unquoted path
+    # that contains a space (e.g. C:\Users\First Last\...) would reach the elevated
+    # PowerShell as "-File C:\Users\First", which cannot be found and closes at
+    # once, before Molt's window ever shows. Do not remove the quotes.
+    $argList = @('-NoProfile','-ExecutionPolicy','Bypass','-File', ('"{0}"' -f $PSCommandPath))
     if ($WhatIf) { $argList += '-WhatIf' }
     if ($Undo)   { $argList += '-Undo' }
     if ($Demo)   { $argList += '-Demo' }
     try   { Start-Process powershell.exe -Verb RunAs -ArgumentList $argList | Out-Null; exit }
     catch { }  # user declined UAC - fall through and run with what we've got
+}
+
+# SAFETY NET: if anything below throws, show the error in a message box instead
+# of letting the window vanish. A user reported the elevated Molt closing the
+# instant it opened, with no message at all, which made the real cause (a space
+# in the path) impossible to see or report. Now it speaks up. This covers the
+# scan, the protection settings, and building the window.
+trap {
+    try { Add-Type -AssemblyName PresentationFramework -ErrorAction Stop } catch { }
+    $reportUrl = 'https://github.com/0xCybin/molt/issues'
+    $text = "Molt ran into a problem and could not finish:`n`n$($_.Exception.Message)`n`nThis is a bug, not something you did. Please report it at $reportUrl so it can be fixed."
+    try   { [void][System.Windows.MessageBox]::Show($text, 'Molt', 'OK', 'Error') }
+    catch { Write-Host $text; [void](Read-Host "`nPress Enter to close") }
+    exit 1
 }
 
 . (Join-Path $here 'src\detect.ps1')
